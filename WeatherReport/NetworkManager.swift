@@ -33,24 +33,30 @@ class NetworkManager {
         
     }
     
-    static func getCurrentWeatherForCity(city:String, completion: @escaping (_ data: LocationData?)->Void){
+    static func getCurrentWeatherForCity(city:String, completion: @escaping (_ data: LocationData?,_ notFound: Bool)->Void){
         var urlString = URLs.openWeatherMainUrl + URLProperties.currentWeather
         urlString += String(format: "q=%@", city)
         urlString += URLProperties.metricUnits
         urlString += URLProperties.APPID
         
-        Alamofire.request(urlString).responseJSON { response in
+        Alamofire.request(urlString).validate().responseJSON { response in
             print("Request: \(String(describing: response.request))")   // original url request
             print("Response: \(String(describing: response.response))") // http url response
             print("Result: \(response.result)")                         // response serialization result
+            print("Error: \(String(describing: response.error?.localizedDescription))")
+            
+            var notFound = false
+            if response.response?.statusCode == 404{
+                notFound = true
+            }
             
             guard let result = response.result.value else{
-                completion(nil)
+                completion(nil, notFound)
                 return
             }
             print("JSON: \(result)")
             
-            completion(parseResult(json: JSON(result)))
+            completion(parseResult(json: JSON(result)), notFound)
         }
     }
     
@@ -77,7 +83,7 @@ class NetworkManager {
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm"
             
-            return LocationData(name: cityName, curentTemperature: Int(currentTemperature), maxTemperature: Int(maxTemperature), minTempereture: Int(maxTemperature), humidity: humidity, condition: condition, sunrise: formatter.string(from: Date(timeIntervalSince1970: sunrise)) , sunset: formatter.string(from: Date(timeIntervalSince1970: sunset)), id: id)
+            return LocationData(name: cityName, curentTemperature: Int(currentTemperature), maxTemperature: Int(maxTemperature), minTempereture: Int(minTemperature), humidity: humidity, condition: condition, sunrise: formatter.string(from: Date(timeIntervalSince1970: sunrise)) , sunset: formatter.string(from: Date(timeIntervalSince1970: sunset)), id: id)
         } else{
             return nil
         }

@@ -16,6 +16,32 @@ class WeatherListTableViewController: UITableViewController, CLLocationManagerDe
     var showingAlert = false
     var emptyView:UILabel?
 
+    @IBAction func addButtonClicked(_ sender: UIBarButtonItem) {
+        let alert = UIAlertController(title: "New Location", message: "Enter City Name", preferredStyle: .alert)
+        
+        alert.addTextField { (textField) in
+            textField.placeholder = "city name"
+        }
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak alert] (_) in
+            let textField = alert?.textFields![0]
+            print("Text field: \(String(describing: textField?.text))")
+            if textField?.text == ""{
+                let alert = UIAlertController(title: "Error", message: "City name cannot be empty", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Ok", style: .default, handler: nil))
+                self.present(alert, animated: true)
+            }else{
+                self.addCityLocation(city: (textField?.text!)!)
+            }
+            
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        
+        self.present(alert, animated: true, completion: nil)
+    }
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -39,14 +65,21 @@ class WeatherListTableViewController: UITableViewController, CLLocationManagerDe
     
     func addSampleLocations(){
         addCityLocation(city: "Moscow")
-        addCityLocation(city: "Tel%20Aviv")
-        addCityLocation(city: "New%20York")
+        addCityLocation(city: "Tel Aviv")
+        addCityLocation(city: "New York")
     }
     
     func addCityLocation(city:String){
         requestsCount += 1
-        NetworkManager.getCurrentWeatherForCity(city: city) { data in
+        let escapedString = city.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
+        NetworkManager.getCurrentWeatherForCity(city: escapedString!) { data, notFound in
             self.requestsCount -= 1
+            
+            if notFound{
+                self.showCityNotFoundError(cityName: city)
+                return
+            }
+            
             if let locationData = data{
                 locationData.currentLocation = false
                 self.locationsList = self.locationsList.filter{ $0.id != locationData.id}
@@ -57,6 +90,16 @@ class WeatherListTableViewController: UITableViewController, CLLocationManagerDe
                 self.showInternetUnreachable()
             }
         }
+    }
+    
+    func showCityNotFoundError(cityName: String){
+        let alert = UIAlertController(title: "Error", message: "City \(cityName) not found", preferredStyle: UIAlertControllerStyle.alert)
+        alert.addAction(UIAlertAction(title: "Ok", style: UIAlertActionStyle.default, handler: {_ in
+            
+        }))
+        self.present(alert, animated: true, completion: {
+            
+        })
     }
     
     func updateLocation(){
@@ -175,8 +218,29 @@ class WeatherListTableViewController: UITableViewController, CLLocationManagerDe
         
     }
     
+    func refreshLocations(){
+        for location in locationsList {
+            if !location.currentLocation{
+                addCityLocation(city: location.name)
+            }
+        }
+    }
+    
     @objc func refreshWeatherData(_ sender: Any) {
         updateLocation()
-        addSampleLocations()
+        refreshLocations()
     }
+    
+    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        return indexPath.row != 0
+    }
+    
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
+        if (editingStyle == UITableViewCellEditingStyle.delete) {
+            locationsList.remove(at: indexPath.row)
+            tableView.deleteRows(at: [indexPath], with: .automatic)
+        }
+    }
+    
+    
 }
